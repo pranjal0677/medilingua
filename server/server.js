@@ -5,14 +5,12 @@ import dotenv from 'dotenv';
 import axios from 'axios';
 import authRoutes from './routes/authRoutes.js';
 import historyRoutes from './routes/historyRoutes.js';
-import connectDB from './config/db.js';  // Add this import
 import mongoose from 'mongoose';
 
 dotenv.config();
 
 
 
-connectDB();
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
