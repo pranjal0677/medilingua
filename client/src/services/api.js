@@ -1,7 +1,7 @@
 // client/src/services/api.js
 import axios from 'axios';
 
-const API_URL = 'https://medilingua-server.vercel.app/';
+const API_URL = 'https://medilingua-server.vercel.app/api/';
 
 const api = axios.create({
   baseURL: API_URL,
