@@ -5,14 +5,14 @@ import dotenv from 'dotenv';
 import axios from 'axios';
 import authRoutes from './routes/authRoutes.js';
 import historyRoutes from './routes/historyRoutes.js';
-//import connectDB from './config/db.js';  // Add this import
+import connectDB from './config/db.js';  // Add this import
 import mongoose from 'mongoose';
 
 dotenv.config();
 
 
 
-//connectDB();
+connectDB();
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
@@ -234,6 +234,10 @@ process.on('unhandledRejection', (err) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+});
+
+app.get('/', (req, res) => {
+  res.send('Welcome to the API');
 });
 
 
