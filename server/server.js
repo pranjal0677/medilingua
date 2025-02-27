@@ -239,3 +239,9 @@ app.get('/', (req, res) => {
 });
 
 
+
+app.use(cors({
+  origin: 'https://medilingua.vercel.app', // Replace with your client URL
+  methods: 'GET,POST,PUT,DELETE',
+  credentials: true
+}));
