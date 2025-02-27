@@ -37,6 +37,12 @@ mongoose.connection.on('disconnected', () => {
 
 const app = express();
 
+app.use(cors({
+  origin: 'https://medilingua.vercel.app', // Replace with your client URL
+  methods: 'GET,POST,PUT,DELETE',
+  credentials: true
+}));
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -240,8 +246,3 @@ app.get('/', (req, res) => {
 
 
 
-app.use(cors({
-  origin: 'https://medilingua.vercel.app', // Replace with your client URL
-  methods: 'GET,POST,PUT,DELETE',
-  credentials: true
-}));
