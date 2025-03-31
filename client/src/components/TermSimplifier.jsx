@@ -12,17 +12,17 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { medicalService } from '../services/api';
+import { useAuth } from '@clerk/clerk-react';
 
 const TermSimplifier = () => {
   const [term, setTerm] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { isSignedIn } = useAuth();
   
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-
-  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,19 +31,23 @@ const TermSimplifier = () => {
       return;
     }
 
+    if (!isSignedIn) {
+      setError('Please sign in to use this feature');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
-      console.log('Submitting term:', term); // Debug log
+      console.log('Submitting term:', term);
       const data = await medicalService.simplifyTerm(term);
-      console.log('Received result:', data); // Debug log
-      await medicalService.addTermToHistory(term, data);
+      console.log('Received result:', data);
       
-      const token = localStorage.getItem('token');
-    if (token) {
-      await medicalService.addTermToHistory(term, data);
-    }
-    setResult(data);
+      if (isSignedIn) {
+        await medicalService.addTermToHistory(term, data);
+      }
+      
+      setResult(data);
     } catch (error) {
       console.error('Error:', error);
       setError('Failed to simplify term. Please try again.');
@@ -51,29 +55,6 @@ const TermSimplifier = () => {
       setLoading(false);
     }
   };
-
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   if (!term.trim()) return;
-  
-  //   setLoading(true);
-  //   setError('');
-  //   try {
-  //     const data = await medicalService.simplifyTerm(term);
-      
-  //     // Save to history
-  //     await medicalService.addTermToHistory(term, data);
-      
-  //     setResult(data);
-  //   } catch (error) {
-  //     setError('Failed to simplify term. Please try again.');
-  //     console.error('Error:', error);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
-  
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -94,6 +75,12 @@ const TermSimplifier = () => {
           Medical Term Simplifier
         </Typography>
         
+        {!isSignedIn && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Please sign in to use this feature
+          </Alert>
+        )}
+        
         <form onSubmit={handleSubmit}>
           <TextField
             fullWidth
@@ -102,7 +89,7 @@ const TermSimplifier = () => {
             onChange={(e) => setTerm(e.target.value)}
             margin="normal"
             variant="outlined"
-            disabled={loading}
+            disabled={loading || !isSignedIn}
             error={!!error}
             helperText={error}
             sx={{ 
@@ -115,7 +102,7 @@ const TermSimplifier = () => {
           <Button
             type="submit"
             variant="contained"
-            disabled={loading}
+            disabled={loading || !isSignedIn}
             sx={{ 
               mt: 2,
               width: { xs: '100%', sm: 'auto' }
@@ -211,9 +198,14 @@ const TermSimplifier = () => {
                 >
                   Important Notes:
                 </Typography>
-                <Alert severity="info" sx={{ mt: 1 }}>
+                <Typography 
+                  sx={{
+                    fontSize: { xs: '0.9rem', sm: '1rem' },
+                    color: 'error.main'
+                  }}
+                >
                   {result.notes}
-                </Alert>
+                </Typography>
               </Box>
             )}
           </Box>

@@ -6,10 +6,16 @@ import axios from 'axios';
 import authRoutes from './routes/authRoutes.js';
 import historyRoutes from './routes/historyRoutes.js';
 import mongoose from 'mongoose';
+import { ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
 
+// Load environment variables
 dotenv.config();
 
-
+// Verify required environment variables
+if (!process.env.CLERK_SECRET_KEY) {
+  console.error('CLERK_SECRET_KEY is required but not set in environment variables');
+  process.exit(1);
+}
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)
@@ -34,32 +40,51 @@ mongoose.connection.on('disconnected', () => {
   console.log('Mongoose disconnected');
 });
 
-
 const app = express();
 
+// CORS configuration
 app.use(cors({
-  origin: 'https://medilingua.vercel.app', // Replace with your client URL
+  origin: [
+    'https://medilingua.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:3003',
+    'http://localhost:3004',
+    'http://localhost:3005',
+    'http://localhost:3006',
+    'http://localhost:3007',
+    'http://localhost:3008',
+    'http://localhost:3009',
+    'http://localhost:3010'
+  ],
   methods: 'GET,POST,PUT,DELETE',
-  credentials: true
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Middleware
-app.use(cors());
 app.use(express.json());
 
-
-// server/server.js
-// Add this after your middleware setup
+// Request logging middleware
 app.use((req, res, next) => {
-  console.log('Request Body:', req.body);
+  console.log(`${req.method} ${req.path}`, {
+    body: req.body,
+    headers: req.headers
+  });
   next();
 });
+
+// Protected routes
+app.use('/api/history', ClerkExpressRequireAuth(), historyRoutes);
 
 // Groq API function
 async function callGroqAPI(messages) {
   try {
+    console.log('Calling Groq API with messages:', messages);
     const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-      model: "mixtral-8x7b-32768",
+      model: "llama3-70b-8192", // Using the correct model name
       messages,
       temperature: 0.3,
       max_tokens: 2048
@@ -69,25 +94,40 @@ async function callGroqAPI(messages) {
         'Content-Type': 'application/json'
       }
     });
+    console.log('Groq API response:', response.data);
     return response.data;
   } catch (error) {
     console.error('Groq API Error:', error.response?.data || error.message);
+    if (error.response?.status === 400) {
+      throw new Error('Invalid request to Groq API. Please check the model and parameters.');
+    } else if (error.response?.status === 401) {
+      throw new Error('Unauthorized access to Groq API. Please check your API key.');
+    } else if (error.response?.status === 429) {
+      throw new Error('Rate limit exceeded for Groq API. Please try again later.');
+    } else if (error.response?.status === 404) {
+      throw new Error('Model not found. Please check the model name is correct.');
+    }
     throw error;
   }
 }
 
 // Term simplification endpoint
-app.post('/api/simplify-term', async (req, res) => {
+app.post('/api/simplify-term', ClerkExpressRequireAuth(), async (req, res) => {
   try {
     const { term } = req.body;
+    console.log('Received term:', term);
+    console.log('User:', req.auth);
+    
     if (!term) {
       return res.status(400).json({ error: 'Term is required' });
     }
 
+    console.log('Received term for simplification:', term);
+
     const messages = [
       {
         role: "system",
-        content: "You are a medical expert who explains complex medical terms in simple language."
+        content: "You are a medical expert who explains complex medical terms in simple language. You must respond with valid JSON only, no additional text or formatting."
       },
       {
         role: "user",
@@ -103,124 +143,118 @@ app.post('/api/simplify-term', async (req, res) => {
     ];
 
     const completion = await callGroqAPI(messages);
-    const result = JSON.parse(completion.choices[0].message.content);
+    let result;
+    try {
+      const content = completion.choices[0].message.content;
+      // Remove any markdown formatting if present
+      const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
+      result = JSON.parse(cleanContent);
+    } catch (parseError) {
+      console.error('Error parsing Groq API response:', parseError);
+      console.log('Raw response content:', completion.choices[0].message.content);
+      return res.status(500).json({ 
+        error: 'Failed to parse API response',
+        details: parseError.message
+      });
+    }
+    
+    console.log('Sending simplified term:', result);
     res.json(result);
 
   } catch (error) {
-    console.error('Server Error:', error);
+    console.error('Error in simplify-term:', error);
     res.status(500).json({ 
-      error: 'Internal server error', 
-      details: error.message 
+      error: error.message || 'Internal server error',
+      details: error.response?.data || error.stack
     });
   }
 });
 
 // Report analysis endpoint
-// app.post('/api/analyze-report', async (req, res) => {
-//   try {
-//     const { reportText } = req.body;
-//     if (!reportText) {
-//       return res.status(400).json({ error: 'Report text is required' });
-//     }
-
-//     const messages = [
-//       {
-//         role: "system",
-//         content: "You are a medical expert who analyzes and simplifies medical reports."
-//       },
-//       {
-//         role: "user",
-//         content: `Analyze this medical report and provide a simplified explanation. 
-//         Format your response as JSON with these exact fields:
-//         {
-//           "summary": "brief summary of the report",
-//           "keyPoints": ["key point 1", "key point 2"],
-//           "medicalTerms": [
-//             {"term": "medical term 1", "explanation": "simple explanation 1"},
-//             {"term": "medical term 2", "explanation": "simple explanation 2"}
-//           ],
-//           "actions": ["action 1", "action 2"],
-//           "warnings": ["warning 1", "warning 2"]
-//         }
-
-//         Medical Report:
-//         ${reportText}`
-//       }
-//     ];
-
-//     const completion = await callGroqAPI(messages);
-//     const result = JSON.parse(completion.choices[0].message.content);
-//     res.json(result);
-
-//   } catch (error) {
-//     console.error('Server Error:', error);
-//     res.status(500).json({ 
-//       error: 'Internal server error',
-//       details: error.message 
-//     });
-//   }
-// });
-
-app.post('/api/analyze-report', async (req, res) => {
+app.post('/api/analyze-report', ClerkExpressRequireAuth(), async (req, res) => {
   try {
     const { reportText } = req.body;
+    console.log('Received report for analysis:', reportText);
+    console.log('User:', req.auth);
+
     if (!reportText) {
       return res.status(400).json({ error: 'Report text is required' });
     }
 
-    const completion = await groq.chat.completions.create({
-      messages: [
+    const messages = [
+      {
+        role: "system",
+        content: "You are a medical expert who analyzes and simplifies medical reports. You must respond with valid JSON only, no additional text or formatting."
+      },
+      {
+        role: "user",
+        content: `Analyze this medical report and provide a simplified explanation. 
+        Format your response as JSON with these exact fields:
         {
-          role: "system",
-          content: "You are a medical expert who analyzes and simplifies medical reports."
-        },
-        {
-          role: "user",
-          content: `Analyze this medical report and provide a simplified explanation. 
-          Format your response as JSON with these exact fields:
-          {
-            "summary": "brief summary of the report",
-            "keyPoints": ["key point 1", "key point 2"],
-            "medicalTerms": [
-              {"term": "term1", "explanation": "explanation1"},
-              {"term": "term2", "explanation": "explanation2"}
-            ],
-            "actions": ["action 1", "action 2"],
-            "warnings": ["warning 1", "warning 2"]
-          }
-
-          Medical Report:
-          ${reportText}`
+          "summary": "brief summary of the report",
+          "keyPoints": ["key point 1", "key point 2"],
+          "medicalTerms": [
+            {"term": "medical term 1", "explanation": "simple explanation 1"},
+            {"term": "medical term 2", "explanation": "simple explanation 2"}
+          ],
+          "actions": ["action 1", "action 2"],
+          "warnings": ["warning 1", "warning 2"]
         }
-      ],
-      model: "mixtral-8x7b-32768",
-      temperature: 0.3,
-    });
 
-    // Parse and validate the response
-    const result = JSON.parse(completion.choices[0].message.content);
-    
-    // Ensure all required fields exist
-    const validatedResult = {
-      summary: result.summary || '',
-      keyPoints: result.keyPoints || [],
-      medicalTerms: result.medicalTerms || [],
-      actions: result.actions || [],
-      warnings: result.warnings || []
-    };
+        Medical Report:
+        ${reportText}`
+      }
+    ];
 
-    res.json(validatedResult);
+    const completion = await callGroqAPI(messages);
+    let result;
+    try {
+      const content = completion.choices[0].message.content;
+      // Remove any markdown formatting if present
+      const cleanContent = content.replace(/```json\n?|\n?```/g, '').trim();
+      
+      // Try to find JSON content if there's any extra text
+      const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+      } else {
+        result = JSON.parse(cleanContent);
+      }
+      
+      console.log('Sending analyzed report:', result);
+      res.json(result);
+    } catch (parseError) {
+      console.error('Error parsing Groq API response:', parseError);
+      console.log('Raw response content:', completion.choices[0].message.content);
+      
+      // If parsing fails, try to extract structured data from the response
+      const content = completion.choices[0].message.content;
+      const fallbackResult = {
+        summary: "Error parsing the full response",
+        keyPoints: [],
+        medicalTerms: [],
+        actions: [],
+        warnings: []
+      };
+      
+      // Send the error response with the raw content for debugging
+      res.status(500).json({ 
+        error: 'Failed to parse API response',
+        details: parseError.message,
+        rawContent: content,
+        fallbackResult
+      });
+    }
   } catch (error) {
-    console.error('Error analyzing report:', error);
+    console.error('Error in analyze-report:', error);
     res.status(500).json({ 
-      error: 'Failed to analyze report',
-      details: error.message 
+      error: error.message || 'Internal server error',
+      details: error.response?.data || error.stack
     });
   }
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api/history', historyRoutes);
 
 // Test route
 app.get('/api/test', (req, res) => {
@@ -234,7 +268,6 @@ process.on('unhandledRejection', (err) => {
   console.error('Unhandled Promise Rejection:', err);
   process.exit(1);
 });
-
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

@@ -13,63 +13,49 @@ import {
   Divider,
 } from '@mui/material';
 import { medicalService } from '../services/api';
+import { useAuth } from '@clerk/clerk-react';
 
 const ReportAnalyzer = () => {
   const [reportText, setReportText] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { isSignedIn } = useAuth();
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  // client/src/components/ReportAnalyzer.jsx
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!reportText.trim()) return;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!reportText.trim()) {
+      setError('Please enter a medical report');
+      return;
+    }
 
-  setLoading(true);
-  setError('');
-  try {
-    // Get analysis from API
-    const analysisResult = await medicalService.analyzeReport(reportText);
-    console.log('Analysis result:', analysisResult);
+    if (!isSignedIn) {
+      setError('Please sign in to use this feature');
+      return;
+    }
 
-    // Save to history with both original text and result
-    await medicalService.addReportToHistory({
-      reportText: reportText,
-      result: analysisResult  // Make sure we're sending the complete result
-    });
-    
-    setResult(analysisResult);
-  } catch (error) {
-    setError('Failed to analyze report. Please try again.');
-    console.error('Error:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    setError('');
+    try {
+      console.log('Sending report for analysis:', reportText);
+      const analysisResult = await medicalService.analyzeReport(reportText);
+      console.log('Received analysis:', analysisResult);
 
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   if (!reportText.trim()) return;
-  
-  //   setLoading(true);
-  //   setError('');
-  //   try {
-  //     const data = await medicalService.analyzeReport(reportText);
+      if (isSignedIn) {
+        await medicalService.addReportToHistory(reportText, analysisResult);
+      }
       
-  //     // Save to history
-  //     await medicalService.addReportToHistory(reportText, data);
-      
-  //     setResult(data);
-  //   } catch (error) {
-  //     setError('Failed to analyze report. Please try again.');
-  //     console.error('Error:', error);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
+      setResult(analysisResult);
+    } catch (error) {
+      console.error('Error:', error);
+      setError('Failed to analyze report. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleClear = () => {
     setReportText('');
@@ -84,6 +70,12 @@ const handleSubmit = async (e) => {
           Medical Report Analyzer
         </Typography>
 
+        {!isSignedIn && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Please sign in to use this feature
+          </Alert>
+        )}
+
         {/* Input Section - Always Visible */}
         <form onSubmit={handleSubmit}>
           <TextField
@@ -95,7 +87,7 @@ const handleSubmit = async (e) => {
             onChange={(e) => setReportText(e.target.value)}
             margin="normal"
             variant="outlined"
-            disabled={loading}
+            disabled={loading || !isSignedIn}
             error={!!error}
             helperText={error}
           />
@@ -103,7 +95,7 @@ const handleSubmit = async (e) => {
             <Button
               type="submit"
               variant="contained"
-              disabled={loading}
+              disabled={loading || !isSignedIn}
               sx={{ minWidth: '120px' }}
             >
               {loading ? <CircularProgress size={24} /> : 'Analyze'}
@@ -112,7 +104,7 @@ const handleSubmit = async (e) => {
               <Button
                 variant="outlined"
                 onClick={handleClear}
-                disabled={loading}
+                disabled={loading || !isSignedIn}
               >
                 Clear
               </Button>

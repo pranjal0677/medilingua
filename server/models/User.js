@@ -2,25 +2,46 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-const userSchema = new mongoose.Schema({
-  name: {
+const historySchema = new mongoose.Schema({
+  type: {
+    type: String,
+    required: true,
+    enum: ['term', 'report']
+  },
+  original: {
     type: String,
     required: true
+  },
+  simplified: {
+    type: mongoose.Schema.Types.Mixed,
+    required: true
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const userSchema = new mongoose.Schema({
+  clerkId: {
+    type: String,
+    required: true,
+    unique: true
   },
   email: {
     type: String,
     required: true,
-    unique: true,
-    lowercase: true
+    unique: true
   },
-  password: {
+  name: {
     type: String,
-    required: true
+    required: false
   },
-  history: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'History'
-  }]
+  history: [historySchema],
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 }, {
   timestamps: true
 });
@@ -43,4 +64,6 @@ userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-export default mongoose.model('User', userSchema);
+const User = mongoose.model('User', userSchema);
+
+export default User;
