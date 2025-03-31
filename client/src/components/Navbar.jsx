@@ -23,6 +23,7 @@ import {
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { medicalService } from '../services/api';
+import { SignInButton, SignUpButton, UserButton, useUser } from '@clerk/clerk-react';
 
 const Navbar = () => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -33,6 +34,7 @@ const Navbar = () => {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { isSignedIn, user: clerkUser } = useUser();
 
   useEffect(() => {
     checkAuthStatus();
@@ -340,36 +342,36 @@ const Navbar = () => {
                 </>
               ) : (
                 <Box sx={{ display: 'flex', gap: 1, ml: 2 }}>
-                  <Button
-                    color="inherit"
-                    component={RouterLink}
-                    to="/signup"
-                    sx={{ 
-                      textTransform: 'none',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                      }
-                    }}
-                  >
-                    Sign Up
-                  </Button>
-                  <Button
-                    color="inherit"
-                    component={RouterLink}
-                    to="/login"
-                    sx={{ 
-                      border: '1px solid',
-                      borderColor: 'rgba(255, 255, 255, 0.5)',
-                      borderRadius: 1,
-                      textTransform: 'none',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        borderColor: 'rgba(255, 255, 255, 0.8)'
-                      }
-                    }}
-                  >
-                    Login
-                  </Button>
+                  <SignUpButton mode="modal">
+                    <Button
+                      color="inherit"
+                      sx={{ 
+                        textTransform: 'none',
+                        '&:hover': {
+                          backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                        }
+                      }}
+                    >
+                      Sign Up
+                    </Button>
+                  </SignUpButton>
+                  <SignInButton mode="modal">
+                    <Button
+                      color="inherit"
+                      sx={{ 
+                        border: '1px solid',
+                        borderColor: 'rgba(255, 255, 255, 0.5)',
+                        borderRadius: 1,
+                        textTransform: 'none',
+                        '&:hover': {
+                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                          borderColor: 'rgba(255, 255, 255, 0.8)'
+                        }
+                      }}
+                    >
+                      Login
+                    </Button>
+                  </SignInButton>
                 </Box>
               )}
             </Box>

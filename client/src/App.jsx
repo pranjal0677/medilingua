@@ -1,23 +1,16 @@
 // client/src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-
-import { CssBaseline, Box } from '@mui/material'; // Add Box import here
+import { CssBaseline, Box } from '@mui/material';
 import Navbar from './components/Navbar';
 import TermSimplifier from './components/TermSimplifier';
 import ReportAnalyzer from './components/ReportAnalyzer';
 import MedicalDictionary from './components/MedicalDictionary';
-import LoginForm from './components/auth/LoginForm';
 import PageLayout from './components/layout/PageLayout';
-import SignupForm from './components/auth/SignupForm';
 import UserHistory from './components/user/UserHistory';
 import UserProfile from './components/user/UserProfile';
-import ProtectedRoute from './components/auth/ProtectedRoute'; // Add this import
-import { AuthProvider } from './context/AuthContext';
-
+import ProtectedRoute from './components/auth/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
-
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-
 
 const darkTheme = createTheme({
   palette: {
@@ -63,12 +56,6 @@ const darkTheme = createTheme({
     },
   },
 });
-
-
-
-
-// ... in your Routes
-
 
 const theme = createTheme({
   palette: {
@@ -118,7 +105,6 @@ const theme = createTheme({
 
 function App() {
   return (
-    <AuthProvider>
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
@@ -135,44 +121,38 @@ function App() {
           <PageLayout>
             <Routes>
               <Route path="/" element={<TermSimplifier />} />
-              <Route path="/report" element={<ReportAnalyzer />} />
+              <Route 
+                path="/report" 
+                element={
+                  <ErrorBoundary>
+                    <ProtectedRoute>
+                      <ReportAnalyzer />
+                    </ProtectedRoute>
+                  </ErrorBoundary>
+                } 
+              />
               <Route path="/dictionary" element={<MedicalDictionary />} />
-              <Route path="/login" element={<LoginForm />} />
-              <Route path="/signup" element={<SignupForm />} />
-              <Route path="/history" element={<UserHistory />} />
-              <Route path="/profile" element={<UserProfile />} />
               <Route 
-  path="/report" 
-  element={
-    <ErrorBoundary>
-      <ReportAnalyzer />
-    </ErrorBoundary>
-  } 
-/>
-              
-              <Route 
-                path="/profile" 
-                  element={
+                path="/history" 
+                element={
                   <ProtectedRoute>
-                  <UserProfile />
+                    <UserHistory />
                   </ProtectedRoute>
                 } 
               />
               <Route 
-              path="/history" 
-              element={
-                <ProtectedRoute>
-                  <UserHistory />
-                </ProtectedRoute>
-              } 
-            />
-              
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <UserProfile />
+                  </ProtectedRoute>
+                } 
+              />
             </Routes>
           </PageLayout>
         </Box>
       </Router>
     </ThemeProvider>
-    </AuthProvider>
   );
 }
 
