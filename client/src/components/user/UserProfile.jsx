@@ -32,12 +32,13 @@ import {
   Refresh as RefreshIcon,
   Close as CloseIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { medicalService } from '../../services/api';
+import { useUser } from '@clerk/clerk-react';
 
 const UserProfile = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user: clerkUser, isSignedIn } = useUser();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState(0);
@@ -53,34 +54,22 @@ const UserProfile = () => {
   });
 
   useEffect(() => {
+    if (!isSignedIn) {
+      navigate('/');
+      return;
+    }
     loadInitialData();
-  }, []);
+  }, [isSignedIn]);
 
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      await Promise.all([loadUserProfile(), loadUserHistory()]);
+      await loadUserHistory();
     } catch (error) {
       console.error('Error loading initial data:', error);
+      setError('Failed to load user data');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadUserProfile = async () => {
-    try {
-      const userData = await medicalService.getProfile();
-      if (!userData) {
-        throw new Error('No user data received');
-      }
-      setUser(userData);
-      setError('');
-    } catch (error) {
-      setError('Failed to load profile');
-      console.error('Profile error:', error);
-      if (error.response?.status === 401) {
-        navigate('/login');
-      }
     }
   };
 
@@ -90,7 +79,6 @@ const UserProfile = () => {
       const historyData = await medicalService.getUserHistory();
       console.log('History data received:', historyData);
 
-      // The data is already processed in the API service
       setHistory({
         terms: historyData.terms || [],
         reports: historyData.reports || []
@@ -134,20 +122,6 @@ const UserProfile = () => {
       type: null,
       data: null
     });
-  };
-
-  const handleLogout = async () => {
-    try {
-      await medicalService.logout();
-      navigate('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to logout',
-        severity: 'error'
-      });
-    }
   };
 
   const handleTabChange = (event, newValue) => {
@@ -201,6 +175,7 @@ const UserProfile = () => {
       </Container>
     );
   }
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -215,30 +190,20 @@ const UserProfile = () => {
                 borderColor: 'primary.light'
               }}
             >
-              {user?.name?.[0]?.toUpperCase() || <PersonIcon fontSize="large" />}
+              {clerkUser?.firstName?.[0]?.toUpperCase() || <PersonIcon fontSize="large" />}
             </Avatar>
             <Box>
-              <Typography variant="h5">{user?.name}</Typography>
-              <Typography color="textSecondary">{user?.email}</Typography>
-              {user?.createdAt && (
-                <Typography variant="caption" color="textSecondary">
-                  Member since: {formatDate(user.createdAt)}
-                </Typography>
-              )}
+              <Typography variant="h5">{clerkUser?.firstName} {clerkUser?.lastName}</Typography>
+              <Typography color="textSecondary">{clerkUser?.primaryEmailAddress?.emailAddress}</Typography>
+              <Typography variant="caption" color="textSecondary">
+                Member since: {formatDate(clerkUser?.createdAt)}
+              </Typography>
             </Box>
           </Box>
           <Box>
             <IconButton onClick={handleRefresh} sx={{ mr: 1 }}>
               <RefreshIcon />
             </IconButton>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<LogoutIcon />}
-              onClick={handleLogout}
-            >
-              Logout
-            </Button>
           </Box>
         </Box>
       </Paper>
@@ -251,21 +216,31 @@ const UserProfile = () => {
         >
           <Tab 
             icon={<SearchIcon />} 
-            label={`Term Searches (${history.terms.length})`}
+            label={`Recent Terms (${Math.min(history.terms.length, 3)})`}
             iconPosition="start"
           />
           <Tab 
             icon={<DocumentIcon />} 
-            label={`Report Analyses (${history.reports.length})`}
+            label={`Recent Reports (${Math.min(history.reports.length, 3)})`}
             iconPosition="start"
           />
         </Tabs>
 
         {activeTab === 0 && (
           <Box>
-            <Typography variant="h6" gutterBottom>
-              Recent Term Searches
-            </Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">Recent Term Searches</Typography>
+              {history.terms.length > 3 && (
+                <Button
+                  component={RouterLink}
+                  to="/history"
+                  endIcon={<HistoryIcon />}
+                  color="primary"
+                >
+                  View Full History
+                </Button>
+              )}
+            </Box>
             {history.terms.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 3 }}>
                 <SearchIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
@@ -275,50 +250,20 @@ const UserProfile = () => {
               </Box>
             ) : (
               <List>
-                {history.terms.map((item, index) => (
-                  <ListItem 
+                {history.terms.slice(0, 3).map((term, index) => (
+                  <ListItem
                     key={index}
-                    divider={index !== history.terms.length - 1}
-                    sx={{
-                      '&:hover': {
-                        backgroundColor: 'action.hover',
-                      },
-                    }}
+                    divider={index !== Math.min(history.terms.length, 3) - 1}
+                    sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
                   >
                     <ListItemText
-                      primary={
-                        <Typography variant="subtitle1" color="primary">
-                          {item.original || 'Unknown Term'}
-                        </Typography>
-                      }
-                      secondary={
-                        <>
-                          <Typography variant="body2" color="text.secondary">
-                            Searched on: {new Date(item.timestamp).toLocaleString()}
-                          </Typography>
-                          {item.simplified?.explanation && (
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
-                                mt: 1,
-                                color: 'text.primary',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden'
-                              }}
-                            >
-                              {item.simplified.explanation}
-                            </Typography>
-                          )}
-                        </>
-                      }
+                      primary={term.original}
+                      secondary={formatDate(term.timestamp)}
                     />
-                    <Button 
-                      size="small" 
-                      variant="outlined"
-                      onClick={() => handleViewTermDetails(item)}
-                      sx={{ ml: 2 }}
+                    <Button
+                      size="small"
+                      onClick={() => handleViewTermDetails(term)}
+                      sx={{ mt: 1 }}
                     >
                       View Details
                     </Button>
@@ -331,9 +276,19 @@ const UserProfile = () => {
 
         {activeTab === 1 && (
           <Box>
-            <Typography variant="h6" gutterBottom>
-              Report Analysis History
-            </Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">Recent Report Analyses</Typography>
+              {history.reports.length > 3 && (
+                <Button
+                  component={RouterLink}
+                  to="/history"
+                  endIcon={<HistoryIcon />}
+                  color="primary"
+                >
+                  View Full History
+                </Button>
+              )}
+            </Box>
             {history.reports.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 3 }}>
                 <DocumentIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
@@ -343,241 +298,138 @@ const UserProfile = () => {
               </Box>
             ) : (
               <List>
-                {history.reports.map((item, index) => {
-                  // Parse the simplified JSON string for reports
-                  let analysis = item.simplified;
-                  try {
-                    if (typeof item.simplified === 'string') {
-                      analysis = JSON.parse(item.simplified);
-                    }
-                  } catch (error) {
-                    console.error('Error parsing report analysis:', error);
-                  }
-
-                  return (
-                    <ListItem 
-                      key={index}
-                      divider={index !== history.reports.length - 1}
-                      sx={{
-                        '&:hover': {
-                          backgroundColor: 'action.hover',
-                        },
-                      }}
+                {history.reports.slice(0, 3).map((report, index) => (
+                  <ListItem
+                    key={index}
+                    divider={index !== Math.min(history.reports.length, 3) - 1}
+                    sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+                  >
+                    <ListItemText
+                      primary={`Report Analysis ${index + 1}`}
+                      secondary={formatDate(report.timestamp)}
+                    />
+                    <Button
+                      size="small"
+                      onClick={() => handleViewReportDetails(report)}
+                      sx={{ mt: 1 }}
                     >
-                      <ListItemText
-                        primary={
-                          <Typography variant="subtitle1" color="primary">
-                            Report Analysis #{index + 1}
-                          </Typography>
-                        }
-                        secondary={
-                          <>
-                            <Typography variant="body2" color="text.secondary">
-                              Analyzed on: {new Date(item.timestamp).toLocaleString()}
-                            </Typography>
-                            {analysis?.summary && (
-                              <Typography 
-                                variant="body2" 
-                                sx={{ 
-                                  mt: 1,
-                                  color: 'text.primary',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden'
-                                }}
-                              >
-                                {analysis.summary}
-                              </Typography>
-                            )}
-                          </>
-                        }
-                      />
-                      <Button 
-                        size="small"
-                        variant="outlined"
-                        onClick={() => handleViewReportDetails(item)}
-                        sx={{ ml: 2 }}
-                      >
-                        View Details
-                      </Button>
-                    </ListItem>
-                  );
-                })}
+                      View Details
+                    </Button>
+                  </ListItem>
+                ))}
               </List>
             )}
           </Box>
         )}
       </Paper>
 
-      {/* Details Modal */}
-      <Dialog
-        open={detailsModal.open}
-        onClose={handleCloseDetails}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6">
-              {detailsModal.type === 'term' ? 'Term Details' : 'Report Analysis Details'}
-            </Typography>
-            <IconButton onClick={handleCloseDetails}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent dividers>
-          {detailsModal.data && (
-            <Box>
-              {detailsModal.type === 'term' ? (
-                // Term Details View
-                <Box>
-                  <Box mb={3}>
-                    <Typography variant="subtitle2" color="textSecondary">Term</Typography>
-                    <Typography variant="h6">{detailsModal.data.original}</Typography>
-                  </Box>
-
-                  <Box mb={3}>
-                    <Typography variant="subtitle2" color="textSecondary">Explanation</Typography>
-                    <Typography paragraph sx={{ mt: 1 }}>
-                      {detailsModal.data.simplified?.explanation}
-                    </Typography>
-                  </Box>
-
-                  {detailsModal.data.simplified?.examples?.length > 0 && (
-                    <Box mb={3}>
-                      <Typography variant="subtitle2" color="textSecondary">Examples</Typography>
-                      <Box sx={{ mt: 1 }}>
-                        {detailsModal.data.simplified.examples.map((example, index) => (
-                          <Typography key={index} paragraph sx={{ pl: 2 }}>
-                            • {example}
-                          </Typography>
-                        ))}
-                      </Box>
+      {detailsModal.open && (
+        <Dialog
+          open={detailsModal.open}
+          onClose={handleCloseDetails}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>
+            {detailsModal.type === 'term' ? 'Term Details' : 'Report Analysis'}
+          </DialogTitle>
+          <DialogContent>
+            {detailsModal.type === 'term' ? (
+              <>
+                <Typography variant="h6" gutterBottom>Original Term</Typography>
+                <Typography paragraph>{detailsModal.data.original}</Typography>
+                <Typography variant="h6" gutterBottom>Simplified Explanation</Typography>
+                <Typography paragraph>
+                  {typeof detailsModal.data.simplified === 'string' 
+                    ? detailsModal.data.simplified 
+                    : detailsModal.data.simplified?.explanation}
+                </Typography>
+                {detailsModal.data.simplified?.examples && (
+                  <>
+                    <Typography variant="h6" gutterBottom>Examples</Typography>
+                    <List>
+                      {detailsModal.data.simplified.examples.map((example, index) => (
+                        <ListItem key={index}>
+                          <ListItemText primary={example} />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </>
+                )}
+                {detailsModal.data.simplified?.relatedTerms && (
+                  <>
+                    <Typography variant="h6" gutterBottom>Related Terms</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {detailsModal.data.simplified.relatedTerms.map((term, index) => (
+                        <Chip key={index} label={term} variant="outlined" />
+                      ))}
                     </Box>
-                  )}
-
-                  {detailsModal.data.simplified?.relatedTerms?.length > 0 && (
-                    <Box mb={3}>
-                      <Typography variant="subtitle2" color="textSecondary">Related Terms</Typography>
-                      <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {detailsModal.data.simplified.relatedTerms.map((term, index) => (
-                          <Chip key={index} label={term} variant="outlined" />
-                        ))}
-                      </Box>
-                    </Box>
-                  )}
-
-                  {detailsModal.data.simplified?.notes && (
-                    <Box mb={3}>
-                      <Typography variant="subtitle2" color="textSecondary">Additional Notes</Typography>
-                      <Alert severity="info" sx={{ mt: 1 }}>
-                        {detailsModal.data.simplified.notes}
-                      </Alert>
-                    </Box>
-                  )}
-                </Box>
-              ) : (
-                // Report Analysis Details View
-                <Box>
-                  {(() => {
-                    let analysis = detailsModal.data.simplified;
-                    try {
-                      if (typeof detailsModal.data.simplified === 'string') {
-                        analysis = JSON.parse(detailsModal.data.simplified);
-                      }
-                    } catch (error) {
-                      console.error('Error parsing report analysis:', error);
+                  </>
+                )}
+                {detailsModal.data.simplified?.notes && (
+                  <>
+                    <Typography variant="h6" gutterBottom>Additional Notes</Typography>
+                    <Alert severity="info">{detailsModal.data.simplified.notes}</Alert>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <Typography variant="h6" gutterBottom>Original Report</Typography>
+                <Typography paragraph>{detailsModal.data.original}</Typography>
+                {(() => {
+                  let analysis = detailsModal.data.simplified;
+                  try {
+                    if (typeof detailsModal.data.simplified === 'string') {
+                      analysis = JSON.parse(detailsModal.data.simplified);
                     }
+                  } catch (error) {
+                    console.error('Error parsing report analysis:', error);
+                  }
 
-                    return (
-                      <>
-                        <Box mb={3}>
-                          <Typography variant="subtitle2" color="textSecondary">Analysis Date</Typography>
-                          <Typography variant="caption">
-                            {new Date(detailsModal.data.timestamp).toLocaleString()}
-                          </Typography>
-                        </Box>
-
-                        <Box mb={3}>
-                          <Typography variant="subtitle2" color="textSecondary">Report Text</Typography>
-                          <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
-                            <Typography>{detailsModal.data.original}</Typography>
-                          </Paper>
-                        </Box>
-
-                        <Box mb={3}>
-                          <Typography variant="subtitle2" color="textSecondary">Summary</Typography>
-                          <Typography paragraph sx={{ mt: 1 }}>
-                            {analysis?.summary}
-                          </Typography>
-                        </Box>
-
-                        {analysis?.keyPoints?.length > 0 && (
-                          <Box mb={3}>
-                            <Typography variant="subtitle2" color="textSecondary">Key Points</Typography>
-                            <Box sx={{ mt: 1 }}>
-                              {analysis.keyPoints.map((point, index) => (
-                                <Typography key={index} paragraph sx={{ pl: 2 }}>
-                                  • {point}
-                                </Typography>
-                              ))}
-                            </Box>
-                          </Box>
-                        )}
-
-                        {analysis?.medicalTerms?.length > 0 && (
-                          <Box mb={3}>
-                            <Typography variant="subtitle2" color="textSecondary">Medical Terms</Typography>
-                            <Box sx={{ mt: 1 }}>
-                              {analysis.medicalTerms.map((term, index) => (
-                                <Box key={index} sx={{ mb: 2 }}>
-                                  <Typography variant="subtitle2">{term.term}</Typography>
-                                  <Typography color="text.secondary">{term.explanation}</Typography>
-                                </Box>
-                              ))}
-                            </Box>
-                          </Box>
-                        )}
-
-                        {analysis?.actions?.length > 0 && (
-                          <Box mb={3}>
-                            <Typography variant="subtitle2" color="textSecondary">Recommended Actions</Typography>
-                            <Box sx={{ mt: 1 }}>
-                              {analysis.actions.map((action, index) => (
-                                <Typography key={index} paragraph sx={{ pl: 2 }}>
-                                  • {action}
-                                </Typography>
-                              ))}
-                            </Box>
-                          </Box>
-                        )}
-
-                        {analysis?.warnings?.length > 0 && (
-                          <Box mb={3}>
-                            <Typography variant="subtitle2" color="textSecondary">Warnings</Typography>
-                            <Box sx={{ mt: 1 }}>
-                              {analysis.warnings.map((warning, index) => (
-                                <Alert key={index} severity="warning" sx={{ mb: 1 }}>
-                                  {warning}
-                                </Alert>
-                              ))}
-                            </Box>
-                          </Box>
-                        )}
-                      </>
-                    );
-                  })()}
-                </Box>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDetails}>Close</Button>
-        </DialogActions>
-      </Dialog>
+                  return (
+                    <>
+                      {analysis?.summary && (
+                        <>
+                          <Typography variant="h6" gutterBottom>Analysis Summary</Typography>
+                          <Typography paragraph>{analysis.summary}</Typography>
+                        </>
+                      )}
+                      {analysis?.details && (
+                        <>
+                          <Typography variant="h6" gutterBottom>Detailed Analysis</Typography>
+                          <Typography paragraph>{analysis.details}</Typography>
+                        </>
+                      )}
+                      {analysis?.keyFindings && (
+                        <>
+                          <Typography variant="h6" gutterBottom>Key Findings</Typography>
+                          <Typography paragraph>{analysis.keyFindings}</Typography>
+                        </>
+                      )}
+                      {analysis?.actions && (
+                        <>
+                          <Typography variant="h6" gutterBottom>Recommended Actions</Typography>
+                          <Typography paragraph>{analysis.actions}</Typography>
+                        </>
+                      )}
+                      {analysis?.warnings && (
+                        <>
+                          <Typography variant="h6" gutterBottom>Warnings</Typography>
+                          <Alert severity="warning">{analysis.warnings}</Alert>
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
+              </>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDetails}>Close</Button>
+          </DialogActions>
+        </Dialog>
+      )}
 
       <Snackbar
         open={snackbar.open}
