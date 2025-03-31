@@ -90,11 +90,16 @@ const UserProfile = () => {
       const historyData = await medicalService.getUserHistory();
       console.log('History data received:', historyData);
 
-      const terms = historyData?.filter(item => item.type === 'term') || [];
-      const reports = historyData?.filter(item => item.type === 'report') || [];
+      // The data is already processed in the API service
+      setHistory({
+        terms: historyData.terms || [],
+        reports: historyData.reports || []
+      });
 
-      console.log('Processed history:', { terms, reports });
-      setHistory({ terms, reports });
+      console.log('History state updated:', {
+        terms: historyData.terms?.length || 0,
+        reports: historyData.reports?.length || 0
+      });
     } catch (error) {
       console.error('History error:', error);
       setSnackbar({
@@ -283,7 +288,7 @@ const UserProfile = () => {
                     <ListItemText
                       primary={
                         <Typography variant="subtitle1" color="primary">
-                          {item.data?.term || 'Unknown Term'}
+                          {item.original || 'Unknown Term'}
                         </Typography>
                       }
                       secondary={
@@ -291,7 +296,7 @@ const UserProfile = () => {
                           <Typography variant="body2" color="text.secondary">
                             Searched on: {new Date(item.timestamp).toLocaleString()}
                           </Typography>
-                          {item.data?.explanation && (
+                          {item.simplified?.explanation && (
                             <Typography 
                               variant="body2" 
                               sx={{ 
@@ -303,7 +308,7 @@ const UserProfile = () => {
                                 overflow: 'hidden'
                               }}
                             >
-                              {item.data.explanation}
+                              {item.simplified.explanation}
                             </Typography>
                           )}
                         </>
@@ -324,73 +329,85 @@ const UserProfile = () => {
           </Box>
         )}
 
-{activeTab === 1 && (
-  <Box>
-    <Typography variant="h6" gutterBottom>
-      Report Analysis History
-    </Typography>
-    {history.reports.length === 0 ? (
-      <Box sx={{ textAlign: 'center', py: 3 }}>
-        <DocumentIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
-        <Typography color="textSecondary">
-          No report analyses yet. Try analyzing a medical report!
-        </Typography>
-      </Box>
-    ) : (
-      <List>
-        {history.reports.map((item, index) => (
-          <ListItem 
-            key={index}
-            divider={index !== history.reports.length - 1}
-            sx={{
-              '&:hover': {
-                backgroundColor: 'action.hover',
-              },
-            }}
-          >
-            <ListItemText
-              primary={
-                <Typography variant="subtitle1" color="primary">
-                  Report Analysis #{index + 1}
+        {activeTab === 1 && (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Report Analysis History
+            </Typography>
+            {history.reports.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 3 }}>
+                <DocumentIcon sx={{ fontSize: 40, color: 'text.secondary', mb: 1 }} />
+                <Typography color="textSecondary">
+                  No report analyses yet. Try analyzing a medical report!
                 </Typography>
-              }
-              secondary={
-                <>
-                  <Typography variant="body2" color="textSecondary">
-                    Analyzed on: {new Date(item.timestamp).toLocaleString()}
-                  </Typography>
-                  {item.data?.analysis?.summary && (
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
-                        mt: 1,
-                        color: 'text.primary',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden'
+              </Box>
+            ) : (
+              <List>
+                {history.reports.map((item, index) => {
+                  // Parse the simplified JSON string for reports
+                  let analysis = item.simplified;
+                  try {
+                    if (typeof item.simplified === 'string') {
+                      analysis = JSON.parse(item.simplified);
+                    }
+                  } catch (error) {
+                    console.error('Error parsing report analysis:', error);
+                  }
+
+                  return (
+                    <ListItem 
+                      key={index}
+                      divider={index !== history.reports.length - 1}
+                      sx={{
+                        '&:hover': {
+                          backgroundColor: 'action.hover',
+                        },
                       }}
                     >
-                      {item.data.analysis.summary}
-                    </Typography>
-                  )}
-                </>
-              }
-            />
-            <Button 
-              size="small"
-              variant="outlined"
-              onClick={() => handleViewReportDetails(item)}
-              sx={{ ml: 2 }}
-            >
-              View Details
-            </Button>
-          </ListItem>
-        ))}
-      </List>
-    )}
-  </Box>
-)}
+                      <ListItemText
+                        primary={
+                          <Typography variant="subtitle1" color="primary">
+                            Report Analysis #{index + 1}
+                          </Typography>
+                        }
+                        secondary={
+                          <>
+                            <Typography variant="body2" color="text.secondary">
+                              Analyzed on: {new Date(item.timestamp).toLocaleString()}
+                            </Typography>
+                            {analysis?.summary && (
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  mt: 1,
+                                  color: 'text.primary',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden'
+                                }}
+                              >
+                                {analysis.summary}
+                              </Typography>
+                            )}
+                          </>
+                        }
+                      />
+                      <Button 
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleViewReportDetails(item)}
+                        sx={{ ml: 2 }}
+                      >
+                        View Details
+                      </Button>
+                    </ListItem>
+                  );
+                })}
+              </List>
+            )}
+          </Box>
+        )}
       </Paper>
 
       {/* Details Modal */}
@@ -411,149 +428,152 @@ const UserProfile = () => {
           </Box>
         </DialogTitle>
         <DialogContent dividers>
-  {detailsModal.data && (
-    <Box>
-      {detailsModal.type === 'term' ? (
-        // Term Details View
-        <Box>
-          <Box mb={3}>
-            <Typography variant="subtitle2" color="textSecondary">Term</Typography>
-            <Typography variant="h5" color="primary">{detailsModal.data.data?.term}</Typography>
-            <Typography variant="caption" color="textSecondary">
-              Searched on {new Date(detailsModal.data.timestamp).toLocaleString()}
-            </Typography>
-          </Box>
+          {detailsModal.data && (
+            <Box>
+              {detailsModal.type === 'term' ? (
+                // Term Details View
+                <Box>
+                  <Box mb={3}>
+                    <Typography variant="subtitle2" color="textSecondary">Term</Typography>
+                    <Typography variant="h6">{detailsModal.data.original}</Typography>
+                  </Box>
 
-          <Box mb={3}>
-            <Typography variant="subtitle2" color="textSecondary">Explanation</Typography>
-            <Typography paragraph>{detailsModal.data.result?.explanation}</Typography>
-          </Box>
-
-          {detailsModal.data.result?.examples?.length > 0 && (
-            <Box mb={3}>
-              <Typography variant="subtitle2" color="textSecondary">Examples</Typography>
-              <Box sx={{ mt: 1 }}>
-                {detailsModal.data.result.examples.map((example, index) => (
-                  <Typography key={index} paragraph sx={{ pl: 2 }}>
-                    • {example}
-                  </Typography>
-                ))}
-              </Box>
-            </Box>
-          )}
-
-          {detailsModal.data.result?.relatedTerms?.length > 0 && (
-            <Box mb={3}>
-              <Typography variant="subtitle2" color="textSecondary">Related Terms</Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                {detailsModal.data.result.relatedTerms.map((term, index) => (
-                  <Chip 
-                    key={index} 
-                    label={term} 
-                    variant="outlined" 
-                    color="primary"
-                    size="small"
-                  />
-                ))}
-              </Box>
-            </Box>
-          )}
-
-          {detailsModal.data.result?.notes && (
-            <Box mb={3}>
-              <Typography variant="subtitle2" color="textSecondary">Additional Notes</Typography>
-              <Alert severity="info" sx={{ mt: 1 }}>
-                {detailsModal.data.result.notes}
-              </Alert>
-            </Box>
-          )}
-        </Box>
-      ) : (
-        // Report Analysis Details View
-        <Box>
-          <Box mb={3}>
-            <Typography variant="subtitle2" color="textSecondary">Analysis Date</Typography>
-            <Typography variant="caption">
-              {new Date(detailsModal.data.timestamp).toLocaleString()}
-            </Typography>
-          </Box>
-
-          <Box mb={3}>
-            <Typography variant="subtitle2" color="textSecondary">Report Text</Typography>
-            <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
-              <Typography>{detailsModal.data.data?.reportText}</Typography>
-            </Paper>
-          </Box>
-
-          <Box mb={3}>
-            <Typography variant="subtitle2" color="textSecondary">Summary</Typography>
-            <Typography paragraph sx={{ mt: 1 }}>
-              {detailsModal.data.result?.summary}
-            </Typography>
-          </Box>
-
-          {detailsModal.data.result?.keyPoints?.length > 0 && (
-            <Box mb={3}>
-              <Typography variant="subtitle2" color="textSecondary">Key Points</Typography>
-              <Box sx={{ mt: 1 }}>
-                {detailsModal.data.result.keyPoints.map((point, index) => (
-                  <Typography key={index} paragraph sx={{ pl: 2 }}>
-                    • {point}
-                  </Typography>
-                ))}
-              </Box>
-            </Box>
-          )}
-
-          {detailsModal.data.result?.medicalTerms?.length > 0 && (
-            <Box mb={3}>
-              <Typography variant="subtitle2" color="textSecondary">Medical Terms Explained</Typography>
-              <Box sx={{ mt: 1 }}>
-                {detailsModal.data.result.medicalTerms.map((term, index) => (
-                  <Box key={index} sx={{ mb: 2, pl: 2 }}>
-                    <Typography color="primary" fontWeight="medium">
-                      {term.term}
-                    </Typography>
-                    <Typography>
-                      {term.explanation}
+                  <Box mb={3}>
+                    <Typography variant="subtitle2" color="textSecondary">Explanation</Typography>
+                    <Typography paragraph sx={{ mt: 1 }}>
+                      {detailsModal.data.simplified?.explanation}
                     </Typography>
                   </Box>
-                ))}
-              </Box>
-            </Box>
-          )}
 
-          {detailsModal.data.result?.actions?.length > 0 && (
-            <Box mb={3}>
-              <Typography variant="subtitle2" color="textSecondary">Recommended Actions</Typography>
-              <Box sx={{ mt: 1 }}>
-                {detailsModal.data.result.actions.map((action, index) => (
-                  <Typography key={index} paragraph sx={{ pl: 2 }}>
-                    • {action}
-                  </Typography>
-                ))}
-              </Box>
-            </Box>
-          )}
+                  {detailsModal.data.simplified?.examples?.length > 0 && (
+                    <Box mb={3}>
+                      <Typography variant="subtitle2" color="textSecondary">Examples</Typography>
+                      <Box sx={{ mt: 1 }}>
+                        {detailsModal.data.simplified.examples.map((example, index) => (
+                          <Typography key={index} paragraph sx={{ pl: 2 }}>
+                            • {example}
+                          </Typography>
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
 
-          {detailsModal.data.result?.warnings?.length > 0 && (
-            <Box mb={3}>
-              <Typography variant="subtitle2" color="textSecondary">Important Warnings</Typography>
-              <Box sx={{ mt: 1 }}>
-                {detailsModal.data.result.warnings.map((warning, index) => (
-                  <Alert severity="warning" key={index} sx={{ mb: 1 }}>
-                    {warning}
-                  </Alert>
-                ))}
-              </Box>
+                  {detailsModal.data.simplified?.relatedTerms?.length > 0 && (
+                    <Box mb={3}>
+                      <Typography variant="subtitle2" color="textSecondary">Related Terms</Typography>
+                      <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {detailsModal.data.simplified.relatedTerms.map((term, index) => (
+                          <Chip key={index} label={term} variant="outlined" />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+
+                  {detailsModal.data.simplified?.notes && (
+                    <Box mb={3}>
+                      <Typography variant="subtitle2" color="textSecondary">Additional Notes</Typography>
+                      <Alert severity="info" sx={{ mt: 1 }}>
+                        {detailsModal.data.simplified.notes}
+                      </Alert>
+                    </Box>
+                  )}
+                </Box>
+              ) : (
+                // Report Analysis Details View
+                <Box>
+                  {(() => {
+                    let analysis = detailsModal.data.simplified;
+                    try {
+                      if (typeof detailsModal.data.simplified === 'string') {
+                        analysis = JSON.parse(detailsModal.data.simplified);
+                      }
+                    } catch (error) {
+                      console.error('Error parsing report analysis:', error);
+                    }
+
+                    return (
+                      <>
+                        <Box mb={3}>
+                          <Typography variant="subtitle2" color="textSecondary">Analysis Date</Typography>
+                          <Typography variant="caption">
+                            {new Date(detailsModal.data.timestamp).toLocaleString()}
+                          </Typography>
+                        </Box>
+
+                        <Box mb={3}>
+                          <Typography variant="subtitle2" color="textSecondary">Report Text</Typography>
+                          <Paper variant="outlined" sx={{ p: 2, mt: 1, bgcolor: 'grey.50' }}>
+                            <Typography>{detailsModal.data.original}</Typography>
+                          </Paper>
+                        </Box>
+
+                        <Box mb={3}>
+                          <Typography variant="subtitle2" color="textSecondary">Summary</Typography>
+                          <Typography paragraph sx={{ mt: 1 }}>
+                            {analysis?.summary}
+                          </Typography>
+                        </Box>
+
+                        {analysis?.keyPoints?.length > 0 && (
+                          <Box mb={3}>
+                            <Typography variant="subtitle2" color="textSecondary">Key Points</Typography>
+                            <Box sx={{ mt: 1 }}>
+                              {analysis.keyPoints.map((point, index) => (
+                                <Typography key={index} paragraph sx={{ pl: 2 }}>
+                                  • {point}
+                                </Typography>
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+
+                        {analysis?.medicalTerms?.length > 0 && (
+                          <Box mb={3}>
+                            <Typography variant="subtitle2" color="textSecondary">Medical Terms</Typography>
+                            <Box sx={{ mt: 1 }}>
+                              {analysis.medicalTerms.map((term, index) => (
+                                <Box key={index} sx={{ mb: 2 }}>
+                                  <Typography variant="subtitle2">{term.term}</Typography>
+                                  <Typography color="text.secondary">{term.explanation}</Typography>
+                                </Box>
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+
+                        {analysis?.actions?.length > 0 && (
+                          <Box mb={3}>
+                            <Typography variant="subtitle2" color="textSecondary">Recommended Actions</Typography>
+                            <Box sx={{ mt: 1 }}>
+                              {analysis.actions.map((action, index) => (
+                                <Typography key={index} paragraph sx={{ pl: 2 }}>
+                                  • {action}
+                                </Typography>
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+
+                        {analysis?.warnings?.length > 0 && (
+                          <Box mb={3}>
+                            <Typography variant="subtitle2" color="textSecondary">Warnings</Typography>
+                            <Box sx={{ mt: 1 }}>
+                              {analysis.warnings.map((warning, index) => (
+                                <Alert key={index} severity="warning" sx={{ mb: 1 }}>
+                                  {warning}
+                                </Alert>
+                              ))}
+                            </Box>
+                          </Box>
+                        )}
+                      </>
+                    );
+                  })()}
+                </Box>
+              )}
             </Box>
           )}
-        </Box>
-      )}
-    </Box>
-  )}
-  
-</DialogContent>
+        </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDetails}>Close</Button>
         </DialogActions>

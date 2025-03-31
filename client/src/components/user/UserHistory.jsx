@@ -33,7 +33,10 @@ import { medicalService } from '../../services/api';
 
 const UserHistory = () => {
   const [tab, setTab] = useState(0);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState({
+    terms: [],
+    reports: []
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
@@ -152,36 +155,34 @@ const UserHistory = () => {
 
         {tab === 0 && (
           <Box>
-            {history.filter(item => item.type === 'term').length === 0 ? (
+            {history.terms.length === 0 ? (
               <NoDataMessage type="term" />
             ) : (
               <List>
-                {history
-                  .filter(item => item.type === 'term')
-                  .map((item, index) => (
-                    <Card key={index} sx={{ mb: 2 }}>
-                      <CardContent>
-                        <ListItem disablePadding>
-                          <ListItemText
-                            primary={item.data.term}
-                            secondary={formatDate(item.timestamp)}
-                            primaryTypographyProps={{
-                              fontWeight: 500,
-                              color: 'primary.main'
-                            }}
-                          />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => handleViewDetails(item)}
-                            sx={{ ml: 2 }}
-                          >
-                            View Details
-                          </Button>
-                        </ListItem>
-                      </CardContent>
-                    </Card>
-                  ))}
+                {history.terms.map((item, index) => (
+                  <Card key={index} sx={{ mb: 2 }}>
+                    <CardContent>
+                      <ListItem disablePadding>
+                        <ListItemText
+                          primary={item.original}
+                          secondary={formatDate(item.timestamp)}
+                          primaryTypographyProps={{
+                            fontWeight: 500,
+                            color: 'primary.main'
+                          }}
+                        />
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleViewDetails(item)}
+                          sx={{ ml: 2 }}
+                        >
+                          View Details
+                        </Button>
+                      </ListItem>
+                    </CardContent>
+                  </Card>
+                ))}
               </List>
             )}
           </Box>
@@ -189,36 +190,34 @@ const UserHistory = () => {
 
         {tab === 1 && (
           <Box>
-            {history.filter(item => item.type === 'report').length === 0 ? (
+            {history.reports.length === 0 ? (
               <NoDataMessage type="report" />
             ) : (
               <List>
-                {history
-                  .filter(item => item.type === 'report')
-                  .map((item, index) => (
-                    <Card key={index} sx={{ mb: 2 }}>
-                      <CardContent>
-                        <ListItem disablePadding>
-                          <ListItemText
-                            primary={`Report Analysis ${index + 1}`}
-                            secondary={formatDate(item.timestamp)}
-                            primaryTypographyProps={{
-                              fontWeight: 500,
-                              color: 'primary.main'
-                            }}
-                          />
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            onClick={() => handleViewDetails(item)}
-                            sx={{ ml: 2 }}
-                          >
-                            View Details
-                          </Button>
-                        </ListItem>
-                      </CardContent>
-                    </Card>
-                  ))}
+                {history.reports.map((item, index) => (
+                  <Card key={index} sx={{ mb: 2 }}>
+                    <CardContent>
+                      <ListItem disablePadding>
+                        <ListItemText
+                          primary={`Report Analysis ${index + 1}`}
+                          secondary={formatDate(item.timestamp)}
+                          primaryTypographyProps={{
+                            fontWeight: 500,
+                            color: 'primary.main'
+                          }}
+                        />
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleViewDetails(item)}
+                          sx={{ ml: 2 }}
+                        >
+                          View Details
+                        </Button>
+                      </ListItem>
+                    </CardContent>
+                  </Card>
+                ))}
               </List>
             )}
           </Box>
@@ -247,22 +246,32 @@ const UserHistory = () => {
                 {selectedItem.type === 'term' ? (
                   <>
                     <Typography variant="subtitle1" color="primary" gutterBottom>
-                      Term Searched:
+                      Original Term:
                     </Typography>
-                    <Typography paragraph>{selectedItem.data.term}</Typography>
-                    {/* Add more term details here */}
+                    <Typography paragraph>{selectedItem.original}</Typography>
+                    <Typography variant="subtitle1" color="primary" gutterBottom>
+                      Simplified Explanation:
+                    </Typography>
+                    <Typography paragraph>{selectedItem.simplified?.explanation}</Typography>
                   </>
                 ) : (
                   <>
                     <Typography variant="subtitle1" color="primary" gutterBottom>
-                      Report Summary:
+                      Report Analysis:
                     </Typography>
-                    <Typography paragraph>{selectedItem.data.summary}</Typography>
-                    {/* Add more report details here */}
+                    <Typography paragraph>{selectedItem.simplified?.summary}</Typography>
+                    {selectedItem.simplified?.details && (
+                      <>
+                        <Typography variant="subtitle1" color="primary" gutterBottom>
+                          Detailed Analysis:
+                        </Typography>
+                        <Typography paragraph>{selectedItem.simplified.details}</Typography>
+                      </>
+                    )}
                   </>
                 )}
                 <Typography variant="caption" color="text.secondary">
-                  Searched on: {formatDate(selectedItem.timestamp)}
+                  {selectedItem.type === 'term' ? 'Searched' : 'Analyzed'} on: {formatDate(selectedItem.timestamp)}
                 </Typography>
               </Box>
             )}

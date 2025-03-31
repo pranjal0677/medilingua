@@ -65,10 +65,30 @@ export const medicalService = {
   },
 
   // History methods
-  async getHistory() {
+  async getUserHistory() {
     try {
+      console.log('Fetching user history...');
       const response = await api.get('/history');
-      return response.data;
+      console.log('Raw history data received:', response.data);
+
+      // Process the history data
+      const processedData = {
+        terms: response.data.filter(item => item.type === 'term').map(item => ({
+          type: item.type,
+          original: item.original,
+          simplified: item.simplified,
+          timestamp: item.timestamp
+        })),
+        reports: response.data.filter(item => item.type === 'report').map(item => ({
+          type: item.type,
+          original: item.original,
+          simplified: item.simplified,
+          timestamp: item.timestamp
+        }))
+      };
+
+      console.log('Processed history data:', processedData);
+      return processedData;
     } catch (error) {
       console.error('Get History Error:', error);
       throw error;
@@ -81,6 +101,16 @@ export const medicalService = {
       return response.data;
     } catch (error) {
       console.error('Add Term Error:', error);
+      throw error;
+    }
+  },
+
+  async addReportToHistory(report, analysis) {
+    try {
+      const response = await api.post('/history/reports', { report, analysis });
+      return response.data;
+    } catch (error) {
+      console.error('Add Report Error:', error);
       throw error;
     }
   },
@@ -113,16 +143,6 @@ export const medicalService = {
       return response.data;
     } catch (error) {
       console.error('API Error:', error);
-      throw error;
-    }
-  },
-
-  async addReportToHistory(report, analysis) {
-    try {
-      const response = await api.post('/history/reports', { report, analysis });
-      return response.data;
-    } catch (error) {
-      console.error('Add Report Error:', error);
       throw error;
     }
   }

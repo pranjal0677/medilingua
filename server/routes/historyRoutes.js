@@ -15,7 +15,26 @@ router.get('/', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(user.history);
+    // Sort history by timestamp in descending order
+    const sortedHistory = user.history.sort((a, b) => 
+      new Date(b.timestamp) - new Date(a.timestamp)
+    );
+
+    // Map history items to ensure consistent structure
+    const processedHistory = sortedHistory.map(item => ({
+      type: item.type,
+      original: item.original,
+      simplified: item.simplified,
+      timestamp: item.timestamp
+    }));
+
+    console.log('Sending processed history:', {
+      totalItems: processedHistory.length,
+      terms: processedHistory.filter(item => item.type === 'term').length,
+      reports: processedHistory.filter(item => item.type === 'report').length
+    });
+
+    res.json(processedHistory);
   } catch (error) {
     console.error('Get history error:', error);
     res.status(500).json({ error: 'Internal server error' });
