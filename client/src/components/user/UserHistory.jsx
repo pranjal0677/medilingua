@@ -256,17 +256,90 @@ const UserHistory = () => {
                   </>
                 ) : (
                   <>
-                    <Typography variant="subtitle1" color="primary" gutterBottom>
-                      Report Analysis:
-                    </Typography>
-                    <Typography paragraph>{selectedItem.simplified?.summary}</Typography>
-                    {selectedItem.simplified?.details && (
-                      <>
+                    <Box mb={3}>
+                      <Typography variant="subtitle1" color="primary" gutterBottom>
+                        Original Report:
+                      </Typography>
+                      <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                        <Typography>{selectedItem.original}</Typography>
+                      </Paper>
+                    </Box>
+
+                    <Box mb={3}>
+                      <Typography variant="subtitle1" color="primary" gutterBottom>
+                        Analysis Summary:
+                      </Typography>
+                      <Typography paragraph>
+                        {typeof selectedItem.simplified === 'string' 
+                          ? JSON.parse(selectedItem.simplified).summary 
+                          : selectedItem.simplified?.summary}
+                      </Typography>
+                    </Box>
+
+                    {(typeof selectedItem.simplified === 'string' 
+                      ? JSON.parse(selectedItem.simplified).details 
+                      : selectedItem.simplified?.details) && (
+                      <Box mb={3}>
                         <Typography variant="subtitle1" color="primary" gutterBottom>
                           Detailed Analysis:
                         </Typography>
-                        <Typography paragraph>{selectedItem.simplified.details}</Typography>
-                      </>
+                        <Typography paragraph>
+                          {typeof selectedItem.simplified === 'string' 
+                            ? JSON.parse(selectedItem.simplified).details 
+                            : selectedItem.simplified?.details}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {(typeof selectedItem.simplified === 'string' 
+                      ? JSON.parse(selectedItem.simplified).keyFindings 
+                      : selectedItem.simplified?.keyFindings) && (
+                      <Box mb={3}>
+                        <Typography variant="subtitle1" color="primary" gutterBottom>
+                          Key Findings:
+                        </Typography>
+                        <Typography paragraph>
+                          {typeof selectedItem.simplified === 'string' 
+                            ? JSON.parse(selectedItem.simplified).keyFindings 
+                            : selectedItem.simplified?.keyFindings}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {(typeof selectedItem.simplified === 'string' 
+                      ? JSON.parse(selectedItem.simplified).actions 
+                      : selectedItem.simplified?.actions)?.length > 0 && (
+                      <Box mb={3}>
+                        <Typography variant="subtitle1" color="primary" gutterBottom>
+                          Recommended Actions:
+                        </Typography>
+                        <Box component="ul" sx={{ pl: 2 }}>
+                          {(typeof selectedItem.simplified === 'string' 
+                            ? JSON.parse(selectedItem.simplified).actions 
+                            : selectedItem.simplified?.actions).map((action, index) => (
+                            <Typography component="li" key={index} paragraph>
+                              {action}
+                            </Typography>
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+
+                    {(typeof selectedItem.simplified === 'string' 
+                      ? JSON.parse(selectedItem.simplified).warnings 
+                      : selectedItem.simplified?.warnings)?.length > 0 && (
+                      <Box mb={3}>
+                        <Typography variant="subtitle1" color="primary" gutterBottom>
+                          Warnings:
+                        </Typography>
+                        {(typeof selectedItem.simplified === 'string' 
+                          ? JSON.parse(selectedItem.simplified).warnings 
+                          : selectedItem.simplified?.warnings).map((warning, index) => (
+                          <Alert key={index} severity="warning" sx={{ mb: 1 }}>
+                            {warning}
+                          </Alert>
+                        ))}
+                      </Box>
                     )}
                   </>
                 )}
