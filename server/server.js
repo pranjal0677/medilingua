@@ -18,13 +18,22 @@ if (!process.env.CLERK_SECRET_KEY) {
 }
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+  socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+  family: 4 // Use IPv4, skip IPv6
+})
   .then(() => {
     console.log('MongoDB Connected');
   })
   .catch((error) => {
     console.error('MongoDB connection error:', error);
-    process.exit(1);
+    // Don't exit process in production to allow serverless function to continue
+    if (process.env.NODE_ENV !== 'production') {
+      process.exit(1);
+    }
   });
 
 // MongoDB Connection Events
@@ -44,23 +53,8 @@ const app = express();
 
 // CORS configuration
 app.use(cors({
-  origin: [
-    'https://medilingua.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:3002',
-    'http://localhost:3003',
-    'http://localhost:3004',
-    'http://localhost:3005',
-    'http://localhost:3006',
-    'http://localhost:3007',
-    'http://localhost:3008',
-    'http://localhost:3009',
-    'http://localhost:3010'
-  ],
-  methods: 'GET,POST,PUT,DELETE',
-  credentials: true,
+  origin: '*',  // Allow all origins temporarily
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -77,7 +71,21 @@ app.use((req, res, next) => {
 });
 
 // Protected routes
-app.use('/api/history', ClerkExpressRequireAuth(), historyRoutes);
+app.use('/api/history', async (req, res, next) => {
+  try {
+    // Wrap the Clerk authentication middleware in a try-catch
+    await ClerkExpressRequireAuth()(req, res, (err) => {
+      if (err) {
+        console.error('Clerk authentication error:', err);
+        return res.status(401).json({ error: 'Authentication failed', details: err.message });
+      }
+      next();
+    });
+  } catch (error) {
+    console.error('Error in Clerk authentication wrapper:', error);
+    res.status(401).json({ error: 'Authentication failed', details: error.message });
+  }
+}, historyRoutes);
 
 // Groq API function
 async function callGroqAPI(messages) {
@@ -112,7 +120,20 @@ async function callGroqAPI(messages) {
 }
 
 // Term simplification endpoint
-app.post('/api/simplify-term', ClerkExpressRequireAuth(), async (req, res) => {
+app.post('/api/simplify-term', async (req, res, next) => {
+  try {
+    await ClerkExpressRequireAuth()(req, res, (err) => {
+      if (err) {
+        console.error('Clerk authentication error:', err);
+        return res.status(401).json({ error: 'Authentication failed', details: err.message });
+      }
+      next();
+    });
+  } catch (error) {
+    console.error('Error in Clerk authentication wrapper:', error);
+    res.status(401).json({ error: 'Authentication failed', details: error.message });
+  }
+}, async (req, res) => {
   try {
     const { term } = req.body;
     console.log('Received term:', term);
@@ -171,7 +192,20 @@ app.post('/api/simplify-term', ClerkExpressRequireAuth(), async (req, res) => {
 });
 
 // Report analysis endpoint
-app.post('/api/analyze-report', ClerkExpressRequireAuth(), async (req, res) => {
+app.post('/api/analyze-report', async (req, res, next) => {
+  try {
+    await ClerkExpressRequireAuth()(req, res, (err) => {
+      if (err) {
+        console.error('Clerk authentication error:', err);
+        return res.status(401).json({ error: 'Authentication failed', details: err.message });
+      }
+      next();
+    });
+  } catch (error) {
+    console.error('Error in Clerk authentication wrapper:', error);
+    res.status(401).json({ error: 'Authentication failed', details: error.message });
+  }
+}, async (req, res) => {
   try {
     const { reportText } = req.body;
     console.log('Received report for analysis:', reportText);

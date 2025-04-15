@@ -4,12 +4,10 @@ import {
   Paper,
   Typography,
   Box,
-  Tab,
-  Tabs,
   List,
   ListItem,
   ListItemText,
-  Divider,
+  ListItemIcon,
   CircularProgress,
   Alert,
   Button,
@@ -22,17 +20,21 @@ import {
   IconButton,
   Card,
   CardContent,
+  Chip,
+  Divider,
+  Grid,
 } from '@mui/material';
 import {
   History as HistoryIcon,
   Search as SearchIcon,
   Description as DescriptionIcon,
   Close as CloseIcon,
+  TextFields as TermIcon,
+  Assignment as ReportIcon,
 } from '@mui/icons-material';
 import { medicalService } from '../../services/api';
 
 const UserHistory = () => {
-  const [tab, setTab] = useState(0);
   const [history, setHistory] = useState({
     terms: [],
     reports: []
@@ -43,7 +45,7 @@ const UserHistory = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   useEffect(() => {
     loadHistory();
@@ -58,10 +60,6 @@ const UserHistory = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleTabChange = (event, newValue) => {
-    setTab(newValue);
   };
 
   const handleViewDetails = (item) => {
@@ -107,12 +105,61 @@ const UserHistory = () => {
     >
       {type === 'term' ? <SearchIcon sx={{ fontSize: 48, mb: 2 }} /> : <DescriptionIcon sx={{ fontSize: 48, mb: 2 }} />}
       <Typography variant="h6">No {type === 'term' ? 'term searches' : 'report analyses'} yet</Typography>
-      <Typography variant="body2">Your history will appear here</Typography>
+      <Typography variant="body2">Your {type === 'term' ? 'term search' : 'report analysis'} history will appear here</Typography>
+    </Box>
+  );
+
+  const HistoryColumn = ({ items, type, title, icon }) => (
+    <Box sx={{ height: '100%' }}>
+      <Box display="flex" alignItems="center" mb={2}>
+        {icon}
+        <Typography variant="h6" color={type === 'term' ? 'primary' : 'secondary'} sx={{ ml: 1 }}>
+          {title}
+        </Typography>
+      </Box>
+      
+      {items.length === 0 ? (
+        <NoDataMessage type={type} />
+      ) : (
+        <List sx={{ maxHeight: '600px', overflow: 'auto' }}>
+          {items.map((item, index) => (
+            <Card key={index} sx={{ mb: 2 }}>
+              <CardContent>
+                <ListItem disablePadding>
+                  <ListItemText
+                    primary={
+                      type === 'term' 
+                        ? item.original
+                        : (item.original.length > 50 
+                            ? `${item.original.substring(0, 50)}...` 
+                            : item.original)
+                    }
+                    secondary={formatDate(item.timestamp)}
+                    primaryTypographyProps={{
+                      fontWeight: 500,
+                      color: type === 'term' ? 'primary.main' : 'secondary.main'
+                    }}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => handleViewDetails({ ...item, type })}
+                    sx={{ ml: 2 }}
+                    color={type === 'term' ? 'primary' : 'secondary'}
+                  >
+                    View
+                  </Button>
+                </ListItem>
+              </CardContent>
+            </Card>
+          ))}
+        </List>
+      )}
     </Box>
   );
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', p: { xs: 2, sm: 3 } }}>
+    <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, sm: 3 } }}>
       <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}>
         <Box display="flex" alignItems="center" mb={3}>
           <HistoryIcon color="primary" sx={{ mr: 1, fontSize: 28 }} />
@@ -131,96 +178,49 @@ const UserHistory = () => {
           </Alert>
         )}
 
-        <Tabs 
-          value={tab} 
-          onChange={handleTabChange} 
-          sx={{ 
-            mb: 3,
-            borderBottom: 1,
-            borderColor: 'divider',
-          }}
-          variant={isMobile ? "fullWidth" : "standard"}
-        >
-          <Tab 
-            label="Term Searches" 
-            icon={<SearchIcon />} 
-            iconPosition="start"
-          />
-          <Tab 
-            label="Report Analyses" 
-            icon={<DescriptionIcon />} 
-            iconPosition="start"
-          />
-        </Tabs>
-
-        {tab === 0 && (
+        {isMobile ? (
+          // Mobile view - stacked columns
           <Box>
-            {history.terms.length === 0 ? (
-              <NoDataMessage type="term" />
-            ) : (
-              <List>
-                {history.terms.map((item, index) => (
-                  <Card key={index} sx={{ mb: 2 }}>
-                    <CardContent>
-                      <ListItem disablePadding>
-                        <ListItemText
-                          primary={item.original}
-                          secondary={formatDate(item.timestamp)}
-                          primaryTypographyProps={{
-                            fontWeight: 500,
-                            color: 'primary.main'
-                          }}
-                        />
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => handleViewDetails(item)}
-                          sx={{ ml: 2 }}
-                        >
-                          View Details
-                        </Button>
-                      </ListItem>
-                    </CardContent>
-                  </Card>
-                ))}
-              </List>
-            )}
+            <Box mb={4}>
+              <HistoryColumn 
+                items={history.terms} 
+                type="term" 
+                title="Term Search History" 
+                icon={<TermIcon color="primary" />} 
+              />
+            </Box>
+            <Divider sx={{ my: 3 }} />
+            <Box>
+              <HistoryColumn 
+                items={history.reports} 
+                type="report" 
+                title="Report Analysis History" 
+                icon={<ReportIcon color="secondary" />} 
+              />
+            </Box>
           </Box>
-        )}
-
-        {tab === 1 && (
-          <Box>
-            {history.reports.length === 0 ? (
-              <NoDataMessage type="report" />
-            ) : (
-              <List>
-                {history.reports.map((item, index) => (
-                  <Card key={index} sx={{ mb: 2 }}>
-                    <CardContent>
-                      <ListItem disablePadding>
-                        <ListItemText
-                          primary={`Report Analysis ${index + 1}`}
-                          secondary={formatDate(item.timestamp)}
-                          primaryTypographyProps={{
-                            fontWeight: 500,
-                            color: 'primary.main'
-                          }}
-                        />
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => handleViewDetails(item)}
-                          sx={{ ml: 2 }}
-                        >
-                          View Details
-                        </Button>
-                      </ListItem>
-                    </CardContent>
-                  </Card>
-                ))}
-              </List>
-            )}
-          </Box>
+        ) : (
+          // Desktop view - side by side columns
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <HistoryColumn 
+                items={history.terms} 
+                type="term" 
+                title="Term Search History" 
+                icon={<TermIcon color="primary" />} 
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Box sx={{ borderLeft: `1px solid ${theme.palette.divider}`, pl: 3, height: '100%' }}>
+                <HistoryColumn 
+                  items={history.reports} 
+                  type="report" 
+                  title="Report Analysis History" 
+                  icon={<ReportIcon color="secondary" />} 
+                />
+              </Box>
+            </Grid>
+          </Grid>
         )}
 
         <Dialog
@@ -265,82 +265,96 @@ const UserHistory = () => {
                       </Paper>
                     </Box>
 
-                    <Box mb={3}>
-                      <Typography variant="subtitle1" color="primary" gutterBottom>
-                        Analysis Summary:
-                      </Typography>
-                      <Typography paragraph>
-                        {typeof selectedItem.simplified === 'string' 
-                          ? JSON.parse(selectedItem.simplified).summary 
-                          : selectedItem.simplified?.summary}
-                      </Typography>
-                    </Box>
-
-                    {(typeof selectedItem.simplified === 'string' 
-                      ? JSON.parse(selectedItem.simplified).details 
-                      : selectedItem.simplified?.details) && (
-                      <Box mb={3}>
-                        <Typography variant="subtitle1" color="primary" gutterBottom>
-                          Detailed Analysis:
-                        </Typography>
-                        <Typography paragraph>
-                          {typeof selectedItem.simplified === 'string' 
-                            ? JSON.parse(selectedItem.simplified).details 
-                            : selectedItem.simplified?.details}
-                        </Typography>
-                      </Box>
-                    )}
-
-                    {(typeof selectedItem.simplified === 'string' 
-                      ? JSON.parse(selectedItem.simplified).keyFindings 
-                      : selectedItem.simplified?.keyFindings) && (
-                      <Box mb={3}>
-                        <Typography variant="subtitle1" color="primary" gutterBottom>
-                          Key Findings:
-                        </Typography>
-                        <Typography paragraph>
-                          {typeof selectedItem.simplified === 'string' 
-                            ? JSON.parse(selectedItem.simplified).keyFindings 
-                            : selectedItem.simplified?.keyFindings}
-                        </Typography>
-                      </Box>
-                    )}
-
-                    {(typeof selectedItem.simplified === 'string' 
-                      ? JSON.parse(selectedItem.simplified).actions 
-                      : selectedItem.simplified?.actions)?.length > 0 && (
-                      <Box mb={3}>
-                        <Typography variant="subtitle1" color="primary" gutterBottom>
-                          Recommended Actions:
-                        </Typography>
-                        <Box component="ul" sx={{ pl: 2 }}>
-                          {(typeof selectedItem.simplified === 'string' 
-                            ? JSON.parse(selectedItem.simplified).actions 
-                            : selectedItem.simplified?.actions).map((action, index) => (
-                            <Typography component="li" key={index} paragraph>
-                              {action}
-                            </Typography>
-                          ))}
-                        </Box>
-                      </Box>
-                    )}
-
-                    {(typeof selectedItem.simplified === 'string' 
-                      ? JSON.parse(selectedItem.simplified).warnings 
-                      : selectedItem.simplified?.warnings)?.length > 0 && (
-                      <Box mb={3}>
-                        <Typography variant="subtitle1" color="primary" gutterBottom>
-                          Warnings:
-                        </Typography>
-                        {(typeof selectedItem.simplified === 'string' 
-                          ? JSON.parse(selectedItem.simplified).warnings 
-                          : selectedItem.simplified?.warnings).map((warning, index) => (
-                          <Alert key={index} severity="warning" sx={{ mb: 1 }}>
-                            {warning}
+                    {(() => {
+                      let parsedData;
+                      try {
+                        parsedData = typeof selectedItem.simplified === 'string' 
+                          ? JSON.parse(selectedItem.simplified)
+                          : selectedItem.simplified;
+                      } catch (e) {
+                        console.error('Error parsing simplified report data:', e);
+                        return (
+                          <Alert severity="error" sx={{ mb: 2 }}>
+                            Error displaying report data
                           </Alert>
-                        ))}
-                      </Box>
-                    )}
+                        );
+                      }
+                        
+                      return (
+                        <>
+                          <Box mb={3}>
+                            <Typography variant="subtitle1" color="primary" gutterBottom>
+                              Analysis Summary:
+                            </Typography>
+                            <Typography paragraph>
+                              {parsedData?.summary || 'No summary available'}
+                            </Typography>
+                          </Box>
+
+                          {parsedData?.keyPoints && parsedData.keyPoints.length > 0 && (
+                            <Box mb={3}>
+                              <Typography variant="subtitle1" color="primary" gutterBottom>
+                                Key Points:
+                              </Typography>
+                              <ul>
+                                {parsedData.keyPoints.map((point, idx) => (
+                                  <li key={idx}>
+                                    <Typography>{point}</Typography>
+                                  </li>
+                                ))}
+                              </ul>
+                            </Box>
+                          )}
+
+                          {parsedData?.medicalTerms && parsedData.medicalTerms.length > 0 && (
+                            <Box mb={3}>
+                              <Typography variant="subtitle1" color="primary" gutterBottom>
+                                Medical Terms:
+                              </Typography>
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                {parsedData.medicalTerms.map((term, idx) => (
+                                  <Chip 
+                                    key={idx} 
+                                    label={term} 
+                                    color="primary" 
+                                    variant="outlined" 
+                                    size="small"
+                                  />
+                                ))}
+                              </Box>
+                            </Box>
+                          )}
+
+                          {parsedData?.actions && parsedData.actions.length > 0 && (
+                            <Box mb={3}>
+                              <Typography variant="subtitle1" color="primary" gutterBottom>
+                                Recommended Actions:
+                              </Typography>
+                              <ul>
+                                {parsedData.actions.map((action, idx) => (
+                                  <li key={idx}>
+                                    <Typography>{action}</Typography>
+                                  </li>
+                                ))}
+                              </ul>
+                            </Box>
+                          )}
+
+                          {parsedData?.warnings && parsedData.warnings.length > 0 && (
+                            <Box mb={3}>
+                              <Typography variant="subtitle1" color="primary" gutterBottom>
+                                Warnings:
+                              </Typography>
+                              {parsedData.warnings.map((warning, idx) => (
+                                <Alert key={idx} severity="warning" sx={{ mb: 1 }}>
+                                  {warning}
+                                </Alert>
+                              ))}
+                            </Box>
+                          )}
+                        </>
+                      );
+                    })()}
                   </>
                 )}
                 <Typography variant="caption" color="text.secondary">

@@ -44,7 +44,12 @@ const TermSimplifier = () => {
       console.log('Received result:', data);
       
       if (isSignedIn) {
-        await medicalService.addTermToHistory(term, data);
+        try {
+          await medicalService.addTermToHistory(term, data);
+        } catch (historyError) {
+          console.warn('Could not save to history, but term was simplified:', historyError);
+          // Don't fail the whole operation if history save fails
+        }
       }
       
       setResult(data);

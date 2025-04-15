@@ -31,7 +31,7 @@ const Navbar = () => {
   const { isSignedIn } = useUser();
 
   const menuItems = [
-    { text: 'Term Simplifier', path: '/' },
+    { text: 'Term Simplifier', path: '/term' },
     { text: 'Report Analyzer', path: '/report' },
     { text: 'Dictionary', path: '/dictionary' },
   ];

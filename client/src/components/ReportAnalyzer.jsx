@@ -45,7 +45,12 @@ const ReportAnalyzer = () => {
       console.log('Received analysis:', analysisResult);
 
       if (isSignedIn) {
-        await medicalService.addReportToHistory(reportText, analysisResult);
+        try {
+          await medicalService.addReportToHistory(reportText, analysisResult);
+        } catch (historyError) {
+          console.warn('Could not save to history, but report was analyzed:', historyError);
+          // Don't fail the whole operation if history save fails
+        }
       }
       
       setResult(analysisResult);

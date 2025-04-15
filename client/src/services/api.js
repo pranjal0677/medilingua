@@ -98,6 +98,10 @@ export const medicalService = {
   async addTermToHistory(term, simplifiedTerm) {
     try {
       const response = await api.post('/history/terms', { term, simplifiedTerm });
+      // If we got a warning but the operation technically succeeded
+      if (response.data && response.data.warning) {
+        console.warn(response.data.warning, response.data.error);
+      }
       return response.data;
     } catch (error) {
       console.error('Add Term Error:', error);
@@ -108,6 +112,10 @@ export const medicalService = {
   async addReportToHistory(report, analysis) {
     try {
       const response = await api.post('/history/reports', { report, analysis });
+      // If we got a warning but the operation technically succeeded
+      if (response.data && response.data.warning) {
+        console.warn(response.data.warning, response.data.error);
+      }
       return response.data;
     } catch (error) {
       console.error('Add Report Error:', error);

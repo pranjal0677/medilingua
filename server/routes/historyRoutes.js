@@ -46,29 +46,45 @@ router.post('/terms', async (req, res) => {
   try {
     const { userId } = req.auth;
     const { term, simplifiedTerm } = req.body;
-    console.log('Adding term to history:', { userId, term, simplifiedTerm });
+    console.log('Adding term to history:', { userId, term });
 
-    let user = await User.findOne({ clerkId: userId });
-    if (!user) {
-      user = new User({
-        clerkId: userId,
-        email: req.auth.email || 'unknown',
-        history: []
-      });
-    }
+    // Set a timeout to fail gracefully
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database operation timed out')), 8000)
+    );
 
-    user.history.push({
-      type: 'term',
-      original: term,
-      simplified: simplifiedTerm
-    });
+    // Use a more efficient update operation
+    const updatePromise = User.findOneAndUpdate(
+      { clerkId: userId },
+      { 
+        $push: { 
+          history: {
+            type: 'term',
+            original: term,
+            simplified: simplifiedTerm,
+            timestamp: new Date()
+          }
+        }
+      },
+      { 
+        upsert: true, // Create if not exists
+        new: true, // Return the modified document
+        setDefaultsOnInsert: true // Apply default values if new doc
+      }
+    ).exec();
 
-    await user.save();
+    // Race between the DB operation and the timeout
+    await Promise.race([updatePromise, timeoutPromise]);
+    
     console.log('Term added to history successfully');
     res.json({ message: 'Term added to history' });
   } catch (error) {
-    console.warn('Add term error:', error);
-    res.status(500).json({ error: 'Failed to add term to history' });
+    console.warn('Add term error:', error.message);
+    // Don't fail the request completely, just log the error
+    res.status(200).json({ 
+      warning: 'Could not save to history, but term was simplified successfully',
+      error: error.message 
+    });
   }
 });
 
@@ -79,14 +95,10 @@ router.post('/reports', async (req, res) => {
     const { report, analysis } = req.body;
     console.log('Adding report to history:', { userId });
 
-    let user = await User.findOne({ clerkId: userId });
-    if (!user) {
-      user = new User({
-        clerkId: userId,
-        email: req.auth.email || 'unknown',
-        history: []
-      });
-    }
+    // Set a timeout to fail gracefully
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database operation timed out')), 8000)
+    );
 
     // Convert analysis to string format for storage
     const simplifiedAnalysis = JSON.stringify({
@@ -97,18 +109,38 @@ router.post('/reports', async (req, res) => {
       warnings: analysis.warnings
     });
 
-    user.history.push({
-      type: 'report',
-      original: report,
-      simplified: simplifiedAnalysis // Store the stringified analysis
-    });
+    // Use a more efficient update operation
+    const updatePromise = User.findOneAndUpdate(
+      { clerkId: userId },
+      { 
+        $push: { 
+          history: {
+            type: 'report',
+            original: report,
+            simplified: simplifiedAnalysis,
+            timestamp: new Date()
+          }
+        }
+      },
+      { 
+        upsert: true, // Create if not exists
+        new: true, // Return the modified document
+        setDefaultsOnInsert: true // Apply default values if new doc
+      }
+    ).exec();
 
-    await user.save();
+    // Race between the DB operation and the timeout
+    await Promise.race([updatePromise, timeoutPromise]);
+    
     console.log('Report added to history successfully');
     res.json({ message: 'Report added to history' });
   } catch (error) {
-    console.warn('Add report error:', error);
-    res.status(500).json({ error: 'Failed to add report to history' });
+    console.warn('Add report error:', error.message);
+    // Don't fail the request completely, just log the error
+    res.status(200).json({ 
+      warning: 'Could not save to history, but report was analyzed successfully',
+      error: error.message 
+    });
   }
 });
 

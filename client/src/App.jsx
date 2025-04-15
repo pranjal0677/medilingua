@@ -2,6 +2,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { CssBaseline, Box } from '@mui/material';
 import Navbar from './components/Navbar';
+import HomePage from './components/HomePage';
 import TermSimplifier from './components/TermSimplifier';
 import ReportAnalyzer from './components/ReportAnalyzer';
 import MedicalDictionary from './components/MedicalDictionary';
@@ -120,7 +121,8 @@ function App() {
           <Navbar />
           <PageLayout>
             <Routes>
-              <Route path="/" element={<TermSimplifier />} />
+              <Route path="/" element={<HomePage />} />
+              <Route path="/term" element={<TermSimplifier />} />
               <Route 
                 path="/report" 
                 element={
